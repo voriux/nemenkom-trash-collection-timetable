@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Nemenkom Trash Collection Schedule",
+        "description": "Enter the street name exactly as it appears in the nemenkom.lt PDF schedules (e.g. \"Vaikystės g.\").",
+        "data": {
+          "street": "Street name",
+          "update_interval_hours": "Refresh interval (hours)"
+        }
+      }
+    },
+    "error": {
+      "street_required": "Street name cannot be empty."
+    },
+    "abort": {
+      "already_configured": "This street is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Update settings",
+        "data": {
+          "street": "Street name",
+          "update_interval_hours": "Refresh interval (hours)"
+        }
+      }
+    }
+  }
+}
