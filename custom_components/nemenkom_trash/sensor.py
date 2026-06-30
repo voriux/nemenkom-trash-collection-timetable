@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -23,7 +25,7 @@ async def async_setup_entry(
     entities: list[SensorEntity] = []
     for waste_type in WASTE_TYPES:
         entities.append(NextCollectionDateSensor(coordinator, entry, waste_type))
-        entities.append(DaysRemainingsensor(coordinator, entry, waste_type))
+        entities.append(DaysRemainingSensor(coordinator, entry, waste_type))
 
     async_add_entities(entities)
 
@@ -46,14 +48,25 @@ class _BaseSensor(CoordinatorEntity[NemenkomTrashCoordinator], SensorEntity):
             "entry_type": DeviceEntryType.SERVICE,
         }
 
-    def _collection_data(self) -> dict:
+    def _upcoming_dates(self) -> list[date]:
+        """Return all stored upcoming dates as date objects, filtered to today or later."""
         if self.coordinator.data is None:
-            return {}
-        return self.coordinator.data.get(self._waste_type, {})
+            return []
+        raw = self.coordinator.data.get(self._waste_type, {}).get("upcoming_dates", [])
+        today = date.today()
+        result = []
+        for d_str in raw:
+            try:
+                d = date.fromisoformat(d_str)
+                if d >= today:
+                    result.append(d)
+            except (ValueError, TypeError):
+                pass
+        return result
 
 
 class NextCollectionDateSensor(_BaseSensor):
-    """Shows the ISO date of the next collection."""
+    """Shows the date of the next collection. Computed daily from stored dates."""
 
     def __init__(self, coordinator, entry, waste_type):
         super().__init__(coordinator, entry, waste_type)
@@ -64,21 +77,22 @@ class NextCollectionDateSensor(_BaseSensor):
         self._attr_device_class = SensorDeviceClass.DATE
 
     @property
-    def native_value(self):
-        return self._collection_data().get("next_date")
+    def native_value(self) -> date | None:
+        upcoming = self._upcoming_dates()
+        return upcoming[0] if upcoming else None
 
     @property
     def extra_state_attributes(self):
-        data = self._collection_data()
+        upcoming = self._upcoming_dates()
         return {
-            "upcoming_dates": data.get("upcoming_dates", []),
-            "days_remaining": data.get("days_remaining"),
+            "upcoming_dates": [d.isoformat() for d in upcoming],
+            "days_remaining": (upcoming[0] - date.today()).days if upcoming else None,
             "street": self.coordinator.street,
         }
 
 
-class DaysRemainingsensor(_BaseSensor):
-    """Shows how many days until the next collection."""
+class DaysRemainingSensor(_BaseSensor):
+    """Shows how many days until the next collection. Computed daily from stored dates."""
 
     def __init__(self, coordinator, entry, waste_type):
         super().__init__(coordinator, entry, waste_type)
@@ -89,14 +103,14 @@ class DaysRemainingsensor(_BaseSensor):
         self._attr_native_unit_of_measurement = "days"
 
     @property
-    def native_value(self):
-        return self._collection_data().get("days_remaining")
+    def native_value(self) -> int | None:
+        upcoming = self._upcoming_dates()
+        return (upcoming[0] - date.today()).days if upcoming else None
 
     @property
     def extra_state_attributes(self):
-        data = self._collection_data()
-        next_date = data.get("next_date")
+        upcoming = self._upcoming_dates()
         return {
-            "next_date": next_date.isoformat() if next_date else None,
+            "next_date": upcoming[0].isoformat() if upcoming else None,
             "street": self.coordinator.street,
         }

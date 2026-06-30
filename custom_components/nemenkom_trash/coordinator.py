@@ -32,20 +32,11 @@ def _street_aliases(street: str) -> list[str]:
     return aliases
 
 
-def _days_until(target: date) -> int:
-    return (target - date.today()).days
-
-
 def _build_collection_info(dates: list[date]) -> dict:
+    # Store all dates as ISO strings; sensors recompute next_date and days_remaining
+    # dynamically against date.today() so the value stays accurate between scrapes.
     future = sorted(d for d in dates if d >= date.today())
-    if not future:
-        return {"next_date": None, "days_remaining": None, "upcoming_dates": []}
-    next_date = future[0]
-    return {
-        "next_date": next_date,  # date object — required by SensorDeviceClass.DATE
-        "days_remaining": _days_until(next_date),
-        "upcoming_dates": [d.isoformat() for d in future],
-    }
+    return {"upcoming_dates": [d.isoformat() for d in future]}
 
 
 def _run_scraper(street: str) -> dict[str, dict]:
@@ -78,7 +69,7 @@ def _run_scraper(street: str) -> dict[str, dict]:
         logger.debug("Found %d dates for %s", len(dates), waste_key)
         result[waste_key] = _build_collection_info(dates)
 
-    if not any(result[wt]["upcoming_dates"] for wt in WASTE_TYPES):
+    if not any(result.get(wt, {}).get("upcoming_dates") for wt in WASTE_TYPES):
         raise RuntimeError(
             "No schedule data found for any waste type — "
             "the website may be unreachable or the page structure has changed"
