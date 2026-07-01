@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+# Recompute days_remaining/next_date against the current date even when the
+# coordinator hasn't fetched new data (it only scrapes nemenkom.lt weekly).
+_STATE_REFRESH_INTERVAL = timedelta(hours=1)
 
 from .const import DOMAIN, WASTE_TYPES, WASTE_TYPE_LABELS, WASTE_TYPE_ICONS
 from .coordinator import NemenkomTrashCoordinator
@@ -47,6 +52,16 @@ class _BaseSensor(CoordinatorEntity[NemenkomTrashCoordinator], SensorEntity):
             "model": "Waste Schedule",
             "entry_type": DeviceEntryType.SERVICE,
         }
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._handle_time_update, _STATE_REFRESH_INTERVAL)
+        )
+
+    @callback
+    def _handle_time_update(self, now) -> None:
+        self.async_write_ha_state()
 
     def _upcoming_dates(self) -> list[date]:
         """Return all stored upcoming dates as date objects, filtered to today or later."""

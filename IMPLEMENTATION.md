@@ -108,6 +108,12 @@ All six sensors are grouped under a single virtual device (`device_info` with `i
 
 nemenkom.lt publishes new PDFs quarterly. The default 7-day refresh means the integration picks up a new schedule file within one week of publication. The coordinator also refreshes on HA startup.
 
+### Two refresh clocks, not one
+
+`days_remaining` and `next_date` depend on wall-clock time, not just on the scraped data — they must change every day even though the coordinator only re-scrapes weekly. `CoordinatorEntity` alone does **not** do this: it only calls `async_write_ha_state()` when the coordinator fetches new data or on HA restart, so a purely-dynamic `native_value` property looks correct right after a refresh and then silently goes stale until the next one.
+
+`sensor.py` works around this with its own hourly timer (`async_track_time_interval` in `_BaseSensor.async_added_to_hass`) that calls `async_write_ha_state()` independently of the coordinator. This just re-reads the already-cached `upcoming_dates` and recomputes — no network call, no re-scrape.
+
 ## Known limitations
 
 - **Quarter gap**: When the current quarter's PDFs expire and the new ones are not yet published, `upcoming_dates` will be empty and sensors will show `None`. This is expected; the integration recovers automatically on the next successful fetch.
