@@ -62,16 +62,34 @@ Paste this into a **Manual card** in Lovelace:
 type: entities
 title: Trash Collection
 entities:
-  - entity: sensor.packaging_paper_plastic_metal_days_remaining
+  - entity: sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining
     name: Packaging
     icon: mdi:recycle
-  - entity: sensor.glass_days_remaining
+  - entity: sensor.trash_collection_vaikystes_g_glass_days_remaining
     name: Glass
     icon: mdi:bottle-wine
-  - entity: sensor.household_waste_days_remaining
+  - entity: sensor.trash_collection_vaikystes_g_household_waste_days_remaining
     name: Household Waste
     icon: mdi:trash-can
 ```
+
+### Color-coded Tile cards (core HA, no HACS needed)
+
+Each `*_days_remaining` sensor carries an `urgency` attribute (`critical` / `warning` / `normal`) computed server-side — red when the collection is today or overdue, yellow when it's less than 2 days away, otherwise green. The built-in **Tile card** can template its color straight from that attribute:
+
+```yaml
+type: tile
+entity: sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining
+name: Packaging
+icon: mdi:recycle
+color: >-
+  {% set u = state_attr(entity, 'urgency') %}
+  {% if u == 'critical' %}red
+  {% elif u == 'warning' %}yellow
+  {% else %}green{% endif %}
+```
+
+Duplicate for `sensor.trash_collection_vaikystes_g_glass_days_remaining` and `sensor.trash_collection_vaikystes_g_household_waste_days_remaining`.
 
 ### Mushroom card (requires [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom))
 
@@ -79,15 +97,17 @@ entities:
 type: custom:mushroom-template-card
 primary: Packaging collection
 secondary: >
-  {% set d = states('sensor.packaging_paper_plastic_metal_days_remaining') | int(-1) %}
+  {% set d = states('sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining') | int(-1) %}
   {% if d == 0 %}Today!
   {% elif d == 1 %}Tomorrow
   {% elif d > 1 %}In {{ d }} days
   {% else %}No upcoming dates{% endif %}
 icon: mdi:recycle
 icon_color: >
-  {% set d = states('sensor.packaging_paper_plastic_metal_days_remaining') | int(99) %}
-  {% if d <= 1 %}red{% elif d <= 3 %}orange{% else %}green{% endif %}
+  {% set u = state_attr('sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining', 'urgency') %}
+  {% if u == 'critical' %}red
+  {% elif u == 'warning' %}yellow
+  {% else %}green{% endif %}
 ```
 
 ## Notification automation
@@ -101,19 +121,55 @@ trigger:
     at: "19:00:00"
 condition:
   - condition: numeric_state
-    entity_id: sensor.packaging_paper_plastic_metal_days_remaining
+    entity_id: sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining
     below: 2
     above: -1
 action:
-  - service: notify.mobile_app_your_phone
+  - service: notify.mobile_app_f8
     data:
       title: "♻️ Packaging collection tomorrow"
       message: >
         Put out the packaging bin tonight.
-        Next collection: {{ states('sensor.packaging_paper_plastic_metal_next_collection') }}.
+        Next collection: {{ states('sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_next_collection') }}.
 ```
 
-Duplicate for glass (`sensor.glass_days_remaining`) and household waste (`sensor.household_waste_days_remaining`).
+```yaml
+alias: "Notify: Glass collection tomorrow"
+trigger:
+  - platform: time
+    at: "19:00:00"
+condition:
+  - condition: numeric_state
+    entity_id: sensor.trash_collection_vaikystes_g_glass_days_remaining
+    below: 2
+    above: -1
+action:
+  - service: notify.mobile_app_f8
+    data:
+      title: "♻️ Glass collection tomorrow"
+      message: >
+        Put out the glass bin tonight.
+        Next collection: {{ states('sensor.trash_collection_vaikystes_g_glass_next_collection') }}.
+```
+
+```yaml
+alias: "Notify: Household waste collection tomorrow"
+trigger:
+  - platform: time
+    at: "19:00:00"
+condition:
+  - condition: numeric_state
+    entity_id: sensor.trash_collection_vaikystes_g_household_waste_days_remaining
+    below: 2
+    above: -1
+action:
+  - service: notify.mobile_app_f8
+    data:
+      title: "♻️ Household waste collection tomorrow"
+      message: >
+        Put out the house hold waste bin tonight.
+        Next collection: {{ states('sensor.trash_collection_vaikystes_g_household_waste_next_collection') }}.
+```
 
 ## Troubleshooting
 

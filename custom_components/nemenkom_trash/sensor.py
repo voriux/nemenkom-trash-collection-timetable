@@ -16,6 +16,17 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 # coordinator hasn't fetched new data (it only scrapes nemenkom.lt weekly).
 _STATE_REFRESH_INTERVAL = timedelta(hours=1)
 
+
+def _urgency(days_remaining: int | None) -> str:
+    """Classify days_remaining for dashboard color templates: critical/warning/normal."""
+    if days_remaining is None:
+        return "unknown"
+    if days_remaining <= 0:
+        return "critical"
+    if days_remaining < 2:
+        return "warning"
+    return "normal"
+
 from .const import DOMAIN, WASTE_TYPES, WASTE_TYPE_LABELS, WASTE_TYPE_ICONS
 from .coordinator import NemenkomTrashCoordinator
 
@@ -99,9 +110,11 @@ class NextCollectionDateSensor(_BaseSensor):
     @property
     def extra_state_attributes(self):
         upcoming = self._upcoming_dates()
+        days_remaining = (upcoming[0] - date.today()).days if upcoming else None
         return {
             "upcoming_dates": [d.isoformat() for d in upcoming],
-            "days_remaining": (upcoming[0] - date.today()).days if upcoming else None,
+            "days_remaining": days_remaining,
+            "urgency": _urgency(days_remaining),
             "street": self.coordinator.street,
         }
 
@@ -125,7 +138,9 @@ class DaysRemainingSensor(_BaseSensor):
     @property
     def extra_state_attributes(self):
         upcoming = self._upcoming_dates()
+        days_remaining = (upcoming[0] - date.today()).days if upcoming else None
         return {
             "next_date": upcoming[0].isoformat() if upcoming else None,
+            "urgency": _urgency(days_remaining),
             "street": self.coordinator.street,
         }
