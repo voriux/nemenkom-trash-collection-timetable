@@ -4,8 +4,13 @@ from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from enum import Enum
 
-BASE_URL = "https://www.nemenkom.lt"
-SCHEDULE_PAGE = f"{BASE_URL}/buitiniu-ir-pakuociu-atlieku-surinkimo-grafikas/"
+# Vilnius district municipality republishes the Nemenkom files; nemenkom.lt itself is unreliable.
+BASE_URL = "https://vrsa.lt"
+SCHEDULE_PAGE = f"{BASE_URL}/atlieku-tvarkymas/atlieku-surinkimo-grafikai/404"
+# The page has one section per waste company; other companies' files list the same street names.
+COMPANY_SECTION = "Nemenčinės komunalininkas"
+# A new period's file appears before the current one ends, so read the current and the next one.
+FILES_PER_TYPE = 2
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; HomeAssistant/NemenkomTrash)"}
 
@@ -26,6 +31,7 @@ class ScheduleFile:
     url: str
     title: str
     file_extension: str
+    year: int
 
 
 def _classify_link(title: str, href: str) -> WasteType | None:
@@ -69,19 +75,25 @@ def _extract_year_month(title: str) -> tuple[int, int]:
     return (year, month)
 
 
-def fetch_latest_schedule_files() -> dict[WasteType, ScheduleFile]:
-    """Scrape the schedule page and return the most recent file for each waste type."""
+def fetch_latest_schedule_files() -> dict[WasteType, list[ScheduleFile]]:
+    """Return the newest FILES_PER_TYPE schedule files per waste type, newest first."""
     response = requests.get(SCHEDULE_PAGE, headers=HEADERS, timeout=30)
     response.raise_for_status()
+    return parse_schedule_page(response.text)
 
-    soup = BeautifulSoup(response.text, "lxml")
-    candidates: dict[WasteType, list[tuple[tuple[int, int], ScheduleFile]]] = {
-        WasteType.PACKAGING: [],
-        WasteType.GLASS: [],
-        WasteType.HOUSEHOLD: [],
-    }
 
-    for anchor in soup.find_all("a", href=True):
+def parse_schedule_page(page_html: str) -> dict[WasteType, list[ScheduleFile]]:
+    soup = BeautifulSoup(page_html, "lxml")
+    section = next(
+        (s for s in soup.select("section") if s.find("h2") and COMPANY_SECTION in s.find("h2").get_text()),
+        None,
+    )
+    if section is None:
+        raise RuntimeError(f"No '{COMPANY_SECTION}' section on {SCHEDULE_PAGE}")
+
+    candidates: dict[WasteType, list[tuple[tuple[int, int], ScheduleFile]]] = {wt: [] for wt in WasteType}
+
+    for anchor in section.find_all("a", href=True):
         href: str = anchor["href"]
         if not (href.endswith(".pdf") or href.endswith(".xlsx")):
             continue
@@ -91,22 +103,19 @@ def fetch_latest_schedule_files() -> dict[WasteType, ScheduleFile]:
         if waste_type is None:
             continue
 
-        full_url = href if href.startswith("http") else BASE_URL + href
-        ext = "xlsx" if href.endswith(".xlsx") else "pdf"
-        schedule_file = ScheduleFile(
+        year_month = _extract_year_month(title)
+        candidates[waste_type].append((year_month, ScheduleFile(
             waste_type=waste_type,
-            url=full_url,
+            url=href if href.startswith("http") else BASE_URL + href,
             title=title,
-            file_extension=ext,
-        )
-        candidates[waste_type].append((_extract_year_month(title), schedule_file))
+            file_extension="xlsx" if href.endswith(".xlsx") else "pdf",
+            year=year_month[0],
+        )))
 
-    result: dict[WasteType, ScheduleFile] = {}
+    result: dict[WasteType, list[ScheduleFile]] = {}
     for waste_type, items in candidates.items():
-        if items:
-            items.sort(key=lambda x: x[0], reverse=True)
-            result[waste_type] = items[0][1]
-
+        items.sort(key=lambda x: x[0], reverse=True)
+        result[waste_type] = [f for _, f in items[:FILES_PER_TYPE]]
     return result
 
 

@@ -13,7 +13,7 @@ HA loads the integration on startup
               ▼
 NemenkomTrashCoordinator (timedelta = update_interval_hours)
   ├── _run_scraper() runs in executor thread (blocking I/O safe)
-  │     ├── website_scraper: GET nemenkom.lt → find latest PDF/Excel URLs
+  │     ├── website_scraper: GET vrsa.lt schedule page → newest 2 PDF/Excel URLs per type (Nemenčinės section)
   │     ├── pdf_parser: download + pdfplumber → extract dates per waste type
   │     └── excel_parser: download + openpyxl → extract dates
   │
@@ -40,7 +40,14 @@ Python packages are declared in `manifest.json` under `requirements`:
 
 Home Assistant automatically installs these into its own Python environment on first load. No virtualenv or pip calls needed.
 
+## Source
+
+Files come from the Vilnius district municipality page https://vrsa.lt/atlieku-tvarkymas/atlieku-surinkimo-grafikai/404, which republishes the Nemenkom schedules (nemenkom.lt itself is unreliable). The page has one section per waste company; only the "Nemenčinės komunalininkas" section is read, because other companies list the same street names. The newest two files per waste type are parsed and merged, so the current period keeps its dates after the next period's file appears. The year comes from the link title.
+
 ## PDF structure (confirmed by inspection)
+
+Since 2026 Q4 only the first page's table carries the month header row; tables on later pages continue it, so the parser carries the last header forward. Household waste moved from `.xlsx` to PDF in 2026 H2 with a different layout: column 0 seniūnija, column 1 villages and streets, column 2 weekday, columns 3+ months, and several days per cell (`"1d., 15d., 29d.,"`). The parser treats every non-month column as location text and reads every day number in a month cell. Regression tests with the real files: `tests/test_parsing.py`.
+
 
 Both packaging and glass timetables are multi-page PDFs with this table layout per page:
 
@@ -106,7 +113,7 @@ All six sensors are grouped under a single virtual device (`device_info` with `i
 
 ## Refresh cadence
 
-nemenkom.lt publishes new PDFs quarterly. The default 7-day refresh means the integration picks up a new schedule file within one week of publication. The coordinator also refreshes on HA startup.
+Nemenkom publishes new PDFs quarterly (household: half-yearly). The default 7-day refresh means the integration picks up a new schedule file within one week of publication. The coordinator also refreshes on HA startup.
 
 ### Two refresh clocks, not one
 
@@ -117,7 +124,7 @@ nemenkom.lt publishes new PDFs quarterly. The default 7-day refresh means the in
 ## Known limitations
 
 - **Quarter gap**: When the current quarter's PDFs expire and the new ones are not yet published, `upcoming_dates` will be empty and sensors will show `None`. This is expected; the integration recovers automatically on the next successful fetch.
-- **PDF layout changes**: If nemenkom.lt redesigns their PDF table structure, `_find_header_row()` or the street cell detection may need updating. Enable `custom_components.nemenkom_trash: debug` logging to diagnose.
+- **PDF layout changes**: If Nemenkom redesigns their PDF table structure, `_find_header_row()` or the street cell detection may need updating. Enable `custom_components.nemenkom_trash: debug` logging to diagnose.
 - **Glass frequency**: Glass is collected less frequently; some months have no date for a given street. The sensor shows `None` days remaining when no future date exists in the current schedule file.
 
 ## Adding support for a different street

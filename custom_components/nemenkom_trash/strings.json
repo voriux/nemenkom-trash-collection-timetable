@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Nemenkom Trash Collection Schedule",
-        "description": "Enter the street name exactly as it appears in the nemenkom.lt PDF schedules.",
+        "description": "Enter the street name exactly as it appears in the Nemenkom PDF schedules on vrsa.lt.",
         "data": {
           "street": "Street name",
           "update_interval_hours": "Refresh interval (hours)"
