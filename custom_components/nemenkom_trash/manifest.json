@@ -1,7 +1,7 @@
 {
   "domain": "nemenkom_trash",
   "name": "Nemenkom Trash Collection Schedule",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "documentation": "https://github.com/gpuksmys/trash-collection-timetable",
   "issue_tracker": "https://github.com/gpuksmys/trash-collection-timetable/issues",
   "requirements": [

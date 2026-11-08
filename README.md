@@ -73,42 +73,34 @@ entities:
     icon: mdi:trash-can
 ```
 
-### Color-coded Tile cards (core HA, no HACS needed)
+### Color-coded cards — Mushroom (requires [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom) via HACS)
 
-Each `*_days_remaining` sensor carries an `urgency` attribute (`critical` / `warning` / `normal`) computed server-side — red when the collection is today or overdue, yellow when it's less than 2 days away, otherwise green. The built-in **Tile card** can template its color straight from that attribute:
+Each `*_days_remaining` sensor carries an `urgency` attribute (`critical` / `warning` / `normal`) computed server-side — red when the collection is today or overdue, yellow/amber when it's less than 2 days away, otherwise green.
 
-```yaml
-type: tile
-entity: sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining
-name: Packaging
-icon: mdi:recycle
-color: >-
-  {% set u = state_attr(entity, 'urgency') %}
-  {% if u == 'critical' %}red
-  {% elif u == 'warning' %}yellow
-  {% else %}green{% endif %}
-```
-
-Duplicate for `sensor.trash_collection_vaikystes_g_glass_days_remaining` and `sensor.trash_collection_vaikystes_g_household_waste_days_remaining`.
-
-### Mushroom card (requires [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom))
+> The core **Tile card**'s `color:` field does not reliably support Jinja templates across HA versions — in some versions it silently treats the raw template string as a literal (invalid) color, which renders as the default black/grey icon with no visible error. **Mushroom's `icon_color` templates work correctly on every HA version**, so it's the recommended card here.
 
 ```yaml
 type: custom:mushroom-template-card
 primary: Packaging collection
-secondary: >
-  {% set d = states('sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining') | int(-1) %}
-  {% if d == 0 %}Today!
-  {% elif d == 1 %}Tomorrow
-  {% elif d > 1 %}In {{ d }} days
-  {% else %}No upcoming dates{% endif %}
+secondary: >-
+  {%- set d = states('sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining') | int(-1) -%}
+  {%- if d == 0 -%}Today!
+  {%- elif d == 1 -%}Tomorrow
+  {%- elif d > 1 -%}In {{ d }} days
+  {%- else -%}No upcoming dates
+  {%- endif -%}
 icon: mdi:recycle
-icon_color: >
-  {% set u = state_attr('sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining', 'urgency') %}
-  {% if u == 'critical' %}red
-  {% elif u == 'warning' %}yellow
-  {% else %}green{% endif %}
+icon_color: >-
+  {%- set u = state_attr('sensor.trash_collection_vaikystes_g_packaging_paper_plastic_metal_days_remaining', 'urgency') -%}
+  {%- if u == 'critical' -%}red
+  {%- elif u == 'warning' -%}amber
+  {%- else -%}green
+  {%- endif -%}
 ```
+
+Duplicate for `sensor.trash_collection_vaikystes_g_glass_days_remaining` and `sensor.trash_collection_vaikystes_g_household_waste_days_remaining`.
+
+Before pasting into a card, verify the exact `icon_color` template in **Developer Tools → Template** — it should print exactly `green`, `amber`, or `red` with no blank lines around it. The `{%- ... -%}` trim modifiers strip the stray newlines that plain `{% set %}` / `{% if %}` tags otherwise leave in the output.
 
 ## Notification automation
 

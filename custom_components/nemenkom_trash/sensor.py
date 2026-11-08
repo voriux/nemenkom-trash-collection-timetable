@@ -13,7 +13,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 # Recompute days_remaining/next_date against the current date even when the
-# coordinator hasn't fetched new data (it only scrapes nemenkom.lt weekly).
+# coordinator hasn't fetched new data (it only scrapes the schedule weekly).
 _STATE_REFRESH_INTERVAL = timedelta(hours=1)
 
 
